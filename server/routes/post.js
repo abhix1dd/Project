@@ -8,8 +8,8 @@ router.get("/allpost", verify, async (req, res) => {
   try {
     const post = await Post.find().populate(
       "postedBy",
-      "id firstname lastname"
-    );
+      "_id firstname lastname"
+    ).populate("comments.postedBy","_id firstname lastname");
     res.json({ post });
   } catch (error) {
     return res.status(401).send("Error");
@@ -39,19 +39,7 @@ router.post("/createpost", verify, (req, res) => {
     });
 });
 
-router.get("/mypost", verify, async (req, res) => {
-  try {
-    console.log(req.user._id);
-    const post = await Post.find({ postedBy: req.user._id }).populate(
-      "postedBy",
-      "id name"
-    );
-    if (post.length == 0) console.log("no post");
-    res.json({ post });
-  } catch (error) {
-    return res.status(401).send(error.message);
-  }
-});
+
 
 router.put('/likepost',verify,(req,res)=>{
     Post.findByIdAndUpdate(req.body.postId,{
@@ -87,20 +75,40 @@ router.put('/comment',verify,(req,res)=>{
         text:req.body.text,
         postedBy:req.user._id
     }
+   
     Post.findByIdAndUpdate(req.body.postId,{
         $push:{comments:comment}
     },{
         new:true
     })
-    .populate("comments.postedBy","_id name")
-    .populate("postedBy","_id name")
+    .populate("comments.postedBy","_id firstname lastname")
+    .populate("postedBy","_id firstname lastname")
     .exec((err,result)=>{
         if(err){
             return res.status(422).json({error:err})
         }else{
+         
             res.json(result)
         }
     })
+})
+
+router.delete('/deletepost/:postId',verify,(req,res)=>{
+  Post.findOne({_id:req.params.postId})
+  .populate("postedBy","_id")
+  .exec((err,res)=>{
+    if(err||!res){
+      return res.status(422).send({error:err})
+    }
+    if(res.postedBy._id.toString()===req.user._id.toString()){
+      res.remove()
+      .then(result=>{
+        res.json({message:'Successfully Deleted'})
+      }).catch(err=>{
+        console.log(err)
+      })
+    }
+  })
 })
 
 module.exports = router;
